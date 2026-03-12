@@ -1,30 +1,85 @@
 # openclaw-mcp
 
-KOL 投放管理 MCP 服务 — 将达人筛选、评级、建联话术等核心能力封装为标准 MCP 工具，供 Claude Code 及任意支持 MCP 协议的 AI 直接调用，无需自建服务器。
+**把 KOL 投放的核心判断力，接入任意 AI。**
 
-> 完整的 KOL 投放管理系统见 [kol-claw](https://github.com/sz8887031-bot/kol-claw)
+达人值不值投、报价贵不贵、建联说什么 —— 这些决策以前靠经验靠感觉，现在封装成 6 个 MCP 工具，Claude Code 或任何支持 MCP 协议的 AI 都能直接调用，实时给出结论。
+
+配合 [kol-claw](https://github.com/sz8887031-bot/kol-claw) 主系统，实现从「一句话需求」到「完成建联」的全链路自动化。
 
 ---
 
-## 快速开始
+## 能做什么
 
-### 1. 克隆并安装依赖
+注册这个 MCP 服务之后，你可以直接对 AI 说：
+
+```
+分析一下这个达人：粉丝 8 万，最近5条播放 3万/2.8万/3.5万/2.5万/4万，报价 ¥2000
+```
+
+AI 立刻返回：
+
+```
+评级：B 级
+CPM：71.4（行业基准 15，当前报价明显虚高）
+建议报价：¥600
+话术：「您好，我们参考同类账号数据，这个体量的合理区间在 ¥500-700，
+       您这边能接受吗？长期合作的话我们优先返单。」
+```
+
+不是给你一堆数据让你自己分析，是直接告诉你**结论 + 下一步动作**。
+
+---
+
+## 6 个 MCP 工具
+
+| 工具 | 功能 |
+|------|------|
+| `analyze_creator` | 输入粉丝数、播放量、报价，返回评级、CPM、建议报价、操作建议 |
+| `generate_outreach_script` | 根据达人体量和产品生成个性化私信话术 |
+| `list_creators` | 查询跟进表，按状态/等级筛选 |
+| `add_creator` | 新增达人，自动评级，进入跟进流程 |
+| `update_creator_status` | 更新建联状态，自动记录触达次数和时间 |
+| `get_daily_tasks` | 返回今日待建联清单 + 超3天未回复的跟进提醒 |
+
+---
+
+## 定价标准（内置）
+
+这套评级体系是整个系统的核心，解决了「不知道报价贵不贵」的问题：
+
+**有报价时，按 CPM 判断：**
+
+| 评级 | CPM 区间 | 含义 |
+|------|---------|------|
+| S | < 8 | 极致性价比，立刻锁定 |
+| A | 8–12 | 低于市场价，值得谈 |
+| B | 12–15 | 市场标准价 |
+| C | > 15 | 偏贵，需压价 |
+
+**无报价时，按粉赞比评估达人质量：**
+
+| 评级 | 标准 |
+|------|------|
+| S | 粉赞比 > 5% + 均赞 > 1000 + ≥5条视频 + 稳定性 > 30% |
+| A | 粉赞比 > 5% + 均赞 > 1000（样本不足或波动较大） |
+| B | 粉赞比 2–5% |
+| C | 粉赞比 1–2% |
+| D | 粉赞比 < 1% |
+
+---
+
+## 快速接入
 
 ```bash
 git clone https://github.com/sz8887031-bot/kol-claw-mcp.git
 cd kol-claw-mcp
 pip install -r requirements.txt
-```
 
-### 2. 注册到 Claude Code
-
-```bash
+# 注册到 Claude Code
 claude mcp add openclaw -- python /path/to/kol-claw-mcp/mcp_server.py
 ```
 
-### 3. （可选）指定数据目录
-
-默认读取 `data/` 目录下的 `达人跟进表.csv`，可通过环境变量自定义：
+自定义数据目录：
 
 ```bash
 OPENCLAW_DATA_DIR=/your/data/path claude mcp add openclaw -- python /path/to/mcp_server.py
@@ -32,55 +87,35 @@ OPENCLAW_DATA_DIR=/your/data/path claude mcp add openclaw -- python /path/to/mcp
 
 ---
 
-## MCP 工具（6个）
+## 3 个斜杠命令
 
-| 工具名 | 功能 | 核心参数 |
-|--------|------|----------|
-| `analyze_creator` | 分析达人数据，输出评级和建议报价 | name, followers, views[], price |
-| `generate_outreach_script` | 生成个性化建联私信话术 | name, followers, avg_views, product |
-| `list_creators` | 查询达人跟进表（支持筛选） | status, grade, limit |
-| `add_creator` | 添加新达人到跟进表 | name, followers, views[], price |
-| `update_creator_status` | 更新建联状态和沟通记录 | name, status, notes, wechat |
-| `get_daily_tasks` | 获取今日待跟进任务清单 | — |
+在 Claude Code 中直接使用，无需额外配置：
 
-### 评级标准
-
-**有报价时（按 CPM）**：S < 8 / A 8-12 / B 12-15 / C > 15
-
-**无报价时（按粉赞比，估算点赞 = 播放 × 5%）**：
-- S：粉赞比 > 5% + 均赞 > 1000 + 样本 ≥ 5 条
-- A：粉赞比 > 5% + 均赞 > 1000（样本不足）
-- B：粉赞比 2-5%
-- C：粉赞比 1-2%
-- D：粉赞比 < 1%
-
----
-
-## Claude Code Skills（3个斜杠命令）
-
-Skills 文件位于 `.claude/commands/`，在 Claude Code 对话中直接使用：
-
-| 命令 | 功能 | 示例 |
+| 命令 | 用途 | 示例 |
 |------|------|------|
-| `/kol-analyze` | 分析达人数据并给出评级 | `/kol-analyze 粉丝50万，播放30万、28万、35万，报价8000` |
-| `/kol-outreach` | 生成建联话术 | `/kol-outreach 美食博主小李，粉丝8.5万，均播32万` |
-| `/kol-daily` | 获取今日跟进清单 | `/kol-daily` |
+| `/kol-analyze` | 分析达人，给出评级和报价依据 | `/kol-analyze 粉丝50万，播放30/28/35万，报价8000` |
+| `/kol-outreach` | 生成建联私信话术 | `/kol-outreach 美食博主小李，粉丝8.5万，均播32万` |
+| `/kol-daily` | 今日待跟进任务清单 | `/kol-daily` |
 
 ---
 
 ## 数据格式
 
-跟进表路径：`data/达人跟进表.csv`（运行时自动创建，`data/sample/` 提供示例）
+默认读取 `data/达人跟进表.csv`，`data/sample/` 提供完整演示数据：
+
+```bash
+cp data/sample/*.csv data/
+```
 
 | 字段 | 说明 |
 |------|------|
 | 达人昵称 | 唯一标识 |
 | 粉丝数 | 整数 |
-| 播放1~5 | 最近5条视频播放量 |
-| 报价 | 元，0 或空表示未知 |
+| 播放1～5 | 最近5条视频播放量 |
+| 报价 | 元，0 或空表示未询价 |
 | 建联状态 | 未建联 / 待建联 / 已建联 / 已回复 / 确定合作 |
-| 达人级别 | S / A / B / C / D（自动计算或手动填写） |
-| 沟通记录 | 逐条追加 |
+| 达人级别 | S / A / B / C / D（自动计算） |
+| 沟通记录 | 每次更新自动追加 |
 
 ---
 
